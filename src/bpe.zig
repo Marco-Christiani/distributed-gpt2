@@ -1,5 +1,11 @@
 const std = @import("std");
-const c = @cImport(@cInclude("regex.h"));
+// const c = @cImport(@cInclude("regex.h"));
+
+const c = @cImport({
+    // Define necessary macros that might affect visibility of certain fields
+    @cDefine("NEEDED_MACRO", "definition");
+    @cInclude("regex.h");
+});
 
 pub const Encoder = struct {
     const Self = @This();
@@ -29,7 +35,9 @@ pub const Encoder = struct {
         }
 
         // Setup regex.
-        var slice = try allocator.alignedAlloc(u8, @alignOf(c.regex_t), @sizeOf(c.regex_t));
+        const regex_t_size = 64; // Manually set the size of regex_t since @sizeOf(c.regex_t) failed
+        // const slice = try allocator.alignedAlloc(u8, @alignOf(c.regex_t), @sizeOf(c.regex_t));
+        const slice = try allocator.alignedAlloc(u8, @alignOf(c.regex_t), regex_t_size);
         const regex = @as(*c.regex_t, @ptrCast(slice.ptr));
         const contractions = "'s|'t|'re|'ve|'m|'ll|'d";
         const letters = "|[[:space:]]?[[:alpha:]]+";
@@ -56,20 +64,20 @@ pub const Encoder = struct {
         c.regfree(self.regex);
     }
 
-    pub fn encode(self: Self, inputs: []const u8, outputs: []usize) usize {
+    pub fn encode(self: Self, inputs: []const u8, outputs: []u32) u32 {
         var matches: [1]c.regmatch_t = undefined;
-        var token_idx: usize = 0;
-        var offset: usize = 0;
+        var token_idx: u32 = 0;
+        var offset: u32 = 0;
         while (offset < inputs.len) {
             // Match next word.
             _ = c.regexec(self.regex, inputs[offset..].ptr, matches.len, &matches, 0);
             const match = matches[0];
-            const match_so = offset + @as(usize, @intCast(match.rm_so));
-            const match_eo = offset + @as(usize, @intCast(match.rm_eo));
+            const match_so = offset + @as(u32, @intCast(match.rm_so));
+            const match_eo = offset + @as(u32, @intCast(match.rm_eo));
 
             // Replace bytes with unicode.
             var word: [20]u8 = undefined;
-            var word_eo: usize = 0;
+            var word_eo: u32 = 0;
             for (inputs[match_so..match_eo]) |byte| {
                 for (self.byte_to_unicode.get(byte).?) |code| {
                     word[word_eo] = code;
@@ -78,7 +86,7 @@ pub const Encoder = struct {
             }
 
             // Tokenize word.
-            var token_so: usize = 0;
+            var token_so: u32 = 0;
             var token_eo = word_eo;
             while (token_so < token_eo) {
                 if (self.token_to_idx.contains(word[token_so..token_eo])) {
@@ -96,8 +104,8 @@ pub const Encoder = struct {
         return token_idx;
     }
 
-    pub fn decode(self: Self, inputs: []const usize, outputs: []u8) usize {
-        var outputs_len: usize = 0;
+    pub fn decode(self: Self, inputs: []const u32, outputs: []u8) u32 {
+        var outputs_len: u32 = 0;
         for (inputs) |idx| {
             const token = self.idx_to_token.get(idx).?;
             var i: usize = 0;

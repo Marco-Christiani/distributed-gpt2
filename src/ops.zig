@@ -1,5 +1,8 @@
 const std = @import("std");
-const c = @cImport(@cInclude("Accelerate/Accelerate.h"));
+// const c = @cImport(@cInclude("Accelerate/Accelerate.h"));
+// const c = @cImport(@cInclude("libopenblas"));
+// const c = @cImport(@cInclude("openblas"));
+const c = @cImport(@cInclude("cblas.h"));
 
 pub const Linear = struct {
     const Self = @This();
@@ -263,8 +266,8 @@ pub fn scaled_dot_product_attention(
             const kv_offset = (b * n_heads * seq_len * head_dim) + (h * seq_len * head_dim);
 
             // Compute attention logits, i.e. attn = softmax((q @ k.T) / sqrt(head_dim)).
-            var q_slice = q[qo_offset .. qo_offset + 1 * head_dim];
-            var k_slice = k[kv_offset .. kv_offset + seq_len * head_dim];
+            const q_slice = q[qo_offset .. qo_offset + 1 * head_dim];
+            const k_slice = k[kv_offset .. kv_offset + seq_len * head_dim];
             c.cblas_sgemm(
                 c.CblasRowMajor,
                 c.CblasNoTrans,
@@ -284,8 +287,8 @@ pub fn scaled_dot_product_attention(
             softmax(_attn);
 
             // Compute attn @ v.
-            var v_slice = v[kv_offset .. kv_offset + seq_len * head_dim];
-            var out_slice = outputs[qo_offset .. qo_offset + 1 * head_dim];
+            const v_slice = v[kv_offset .. kv_offset + seq_len * head_dim];
+            const out_slice = outputs[qo_offset .. qo_offset + 1 * head_dim];
             c.cblas_sgemm(
                 c.CblasRowMajor,
                 c.CblasNoTrans,
@@ -311,7 +314,7 @@ pub fn load_tensor(path: []const u8, shape: []const usize, comptime dtype: type,
     for (shape) |item| {
         n_elements *= item;
     }
-    var tensor = try allocator.alloc(dtype, n_elements);
+    const tensor = try allocator.alloc(dtype, n_elements);
 
     const fd = try std.fs.cwd().openFile(path, .{});
     defer fd.close();
@@ -322,5 +325,6 @@ pub fn load_tensor(path: []const u8, shape: []const usize, comptime dtype: type,
 pub fn load_json(path: []const u8, allocator: std.mem.Allocator) !std.json.Value {
     const fd = try std.fs.cwd().openFile(path, .{});
     const buffer = try fd.readToEndAlloc(allocator, 4 * 1024 * 1024);
+    fd.close();
     return std.json.parseFromSliceLeaky(std.json.Value, allocator, buffer, .{});
 }

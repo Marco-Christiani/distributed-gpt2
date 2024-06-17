@@ -25,11 +25,12 @@ pub fn build(b: *std.Build) void {
     });
     exe.linkLibC();
 
-    // Link BLAS. If you're not on MacOS, you need to download and build OpenBLAS and uncomment the
-    // lines below.
-    exe.linkFramework("Accelerate");
-    // exe.addIncludePath("lib/OpenBLAS");
-    // exe.addObjectFile("lib/OpenBLAS/libopenblas.a");
+    exe.addIncludePath(.{ .path = "/usr/include/x86_64-linux-gnu/" });
+    exe.addLibraryPath(.{ .path = "/usr/lib/x86_64-linux-gnu/" });
+    // for arm
+    // exe.addIncludePath(.{ .path = "/lib/arm-linux-gnueabihf/include/" });
+    // exe.addLibraryPath(.{ .path = "/lib/arm-linux-gnueabihf/lib/" });
+    exe.linkSystemLibrary("openblas");
 
     // // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -62,15 +63,20 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/tests.zig" },
+        // .root_source_file = .{ .path = "src/tests.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    // Link BLAS. If you're not on MacOS, you need to download and build OpenBLAS and uncomment the
-    // lines below.
-    unit_tests.linkFramework("Accelerate");
-    // unit_tests.addIncludePath("lib/OpenBLAS");
-    // unit_tests.addObjectFile("lib/OpenBLAS/libopenblas.a");
+    unit_tests.linkLibC();
+
+    unit_tests.addIncludePath(.{ .path = "/usr/include/x86_64-linux-gnu/" });
+    unit_tests.addLibraryPath(.{ .path = "/usr/lib/x86_64-linux-gnu/" });
+
+    // for arm
+    // exe.addIncludePath(.{ .path = "/lib/arm-linux-gnueabihf/include/" });
+    // exe.addLibraryPath(.{ .path = "/lib/arm-linux-gnueabihf/lib/" });
+    unit_tests.linkSystemLibrary("openblas");
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
